@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PostureLab — Evaluación de Postura 3D</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    #canvas-avatar canvas, #canvas-resumen canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body class="bg-[#0d1117] text-gray-200 min-h-screen">
+
+    <header class="border-b border-[#30363d] px-6 py-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold text-white">🧍 PostureLab</h1>
+            <p class="text-xs text-gray-500">Evaluación de postura en tiempo real con avatar 3D</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="badge-modo" class="text-xs px-3 py-1.5 rounded-lg bg-[#161b22] border border-[#30363d] text-gray-300">📷 Cámara en vivo</span>
+            <button id="btn-modo-camara" class="text-xs px-3 py-1.5 rounded-lg bg-[#161b22] border border-[#30363d] hover:border-blue-500/50 transition-all">Cámara</button>
+            <button id="btn-modo-demo" class="text-xs px-3 py-1.5 rounded-lg bg-[#161b22] border border-[#30363d] hover:border-blue-500/50 transition-all">Demostración</button>
+            <button id="btn-mapa-postura" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm px-5 py-2 rounded-lg shadow-lg shadow-blue-500/20 transition-all">🔴 Mapa de Postura</button>
+        </div>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 p-4">
+
+        <!-- Avatar 3D principal -->
+        <div class="bg-[#161b22] border border-[#30363d] rounded-2xl overflow-hidden relative" style="height: 70vh;">
+            <div id="canvas-avatar" class="w-full h-full"></div>
+            <div id="banner-calibracion" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-amber-500/15 border border-amber-500/40 text-amber-300 text-sm px-4 py-2 rounded-lg">
+                📐 Siéntate derecho/a y presiona <b>"Calibrar postura neutra"</b> para empezar
+            </div>
+        </div>
+
+        <!-- Panel lateral -->
+        <div class="flex flex-col gap-4">
+
+            <!-- Cámara -->
+            <div id="panel-camara" class="bg-[#161b22] border border-[#30363d] rounded-2xl p-4">
+                <h2 class="text-xs font-bold tracking-widest text-gray-400 uppercase mb-3">Cámara</h2>
+                <div class="relative rounded-lg overflow-hidden bg-black mb-3" style="aspect-ratio: 4/3;">
+                    <video id="video-camara" class="w-full h-full object-cover -scale-x-100" muted playsinline></video>
+                    <canvas id="overlay-esqueleto" class="absolute inset-0 w-full h-full -scale-x-100 pointer-events-none"></canvas>
+                </div>
+                <select id="select-camara" class="w-full bg-[#0d1117] border border-[#30363d] rounded-lg text-sm px-3 py-2 mb-2"></select>
+                <p id="estado-camara" class="text-xs text-gray-400 mb-3">Iniciando…</p>
+                <button id="btn-calibrar" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-all">📐 Calibrar postura neutra</button>
+            </div>
+
+            <!-- Semáforo -->
+            <div class="bg-[#161b22] border border-[#30363d] rounded-2xl p-4">
+                <h2 class="text-xs font-bold tracking-widest text-gray-400 uppercase mb-3">Diagnóstico</h2>
+                <div id="estado-general" class="text-sm font-semibold text-gray-400 mb-3">Esperando calibración…</div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between items-center px-3 py-2 rounded-lg bg-gray-500/20 text-gray-400" id="sem-cuello">
+                        <span>Cuello</span><span>—</span>
+                    </div>
+                    <div class="flex justify-between items-center px-3 py-2 rounded-lg bg-gray-500/20 text-gray-400" id="sem-espalda">
+                        <span>Espalda</span><span>—</span>
+                    </div>
+                    <div class="flex justify-between items-center px-3 py-2 rounded-lg bg-gray-500/20 text-gray-400" id="sem-hombros">
+                        <span>Hombros</span><span>—</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal: Mapa Corporal de Postura -->
+    <div id="modal-resumen" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#161b22] border border-[#30363d] rounded-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-[#30363d] shrink-0">
+                <h2 class="text-lg font-bold text-white">🔴 Mapa Corporal de Postura</h2>
+                <button id="btn-cerrar-resumen" class="text-gray-400 hover:text-white text-2xl leading-none px-2">&times;</button>
+            </div>
+            <div class="flex-1 flex flex-col md:flex-row min-h-0">
+                <div id="canvas-resumen" class="flex-1 min-h-[260px] relative"></div>
+                <div class="w-full md:w-72 p-5 border-t md:border-t-0 md:border-l border-[#30363d] overflow-y-auto text-sm text-gray-300" id="texto-resumen"></div>
+            </div>
+            <div class="px-6 py-3 border-t border-[#30363d] flex justify-between items-center shrink-0">
+                <span class="text-xs text-gray-500">Los puntos rojos indican zonas con alertas durante la sesión actual.</span>
+                <button id="btn-reiniciar-sesion" class="text-xs px-3 py-1.5 rounded-lg bg-[#0d1117] border border-[#30363d] hover:border-blue-500/50 text-gray-300 transition-all">Reiniciar sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js — vía import map (ESM), la ruta "examples/js" clásica
+         de versiones viejas ya NO se publica en el paquete de npm, así
+         que usamos el formato de módulos moderno y soportado. -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <!-- Nuestro código: posture-math.js no depende de THREE, se deja como
+         script clásico (se ejecuta primero y expone window.PostureMath).
+         scene-builder.js y main.js sí usan THREE, van como módulos ES. -->
+    <script src="{{ url_for('static', filename='js/posture-math.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/scene-builder.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
